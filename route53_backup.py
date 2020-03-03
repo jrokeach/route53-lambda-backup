@@ -185,6 +185,7 @@ def write_zone_to_json(zone, zone_records):
 def lambda_handler(event, context):
     """Handler function for AWS Lambda"""
     time_stamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", datetime.utcnow().utctimetuple())
+    print("Backing up {} hosted zones to {}/{}".format(len(hosted_zones),s3_bucket_name,time_stamp))
     if not create_s3_bucket(s3_bucket_name, s3_bucket_region):
         return False
     # bucket_response = create_s3_bucket(s3_bucket_name, s3_bucket_region)
