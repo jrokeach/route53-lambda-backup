@@ -28,7 +28,3 @@ jobs:
       uses: jpetrucciani/black-check@19.10b0
       with:
         path: .
-    - name: Test with pytest
-      run: |
-        pip install pytest
-        pytest
