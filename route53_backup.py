@@ -20,7 +20,7 @@ try:
     s3_bucket_region = os.environ["S3_BUCKET_REGION"]
 except KeyError as e:
     print("Warning: Environmental variable(s) not defined")
-    if s3_bucket_name=="" or s3_bucket_region=="":
+    if s3_bucket_name == "" or s3_bucket_region == "":
         raise
 
 
@@ -185,13 +185,17 @@ def write_zone_to_json(zone, zone_records):
 def lambda_handler(event, context):
     """Handler function for AWS Lambda"""
     time_stamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", datetime.utcnow().utctimetuple())
-    print("Backing up {} hosted zones to {}/{}".format(len(hosted_zones),s3_bucket_name,time_stamp))
     if not create_s3_bucket(s3_bucket_name, s3_bucket_region):
         return False
     # bucket_response = create_s3_bucket(s3_bucket_name, s3_bucket_region)
     # if(not bucket_response):
     # return False
     hosted_zones = get_route53_hosted_zones()
+    print(
+        "Backing up {} hosted zones to {}/{}".format(
+            len(hosted_zones), s3_bucket_name, time_stamp
+        )
+    )
     for zone in hosted_zones:
         zone_folder = time_stamp + "/" + zone["Name"][:-1]
         zone_records = get_route53_zone_records(zone["Id"])
