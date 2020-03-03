@@ -16,10 +16,12 @@ s3_bucket_name = ""
 s3_bucket_region = ""
 
 try:
-    s3_bucket_name = os.environ["s3_bucket_name"]
-    s3_bucket_region = os.environ["s3_bucket_region"]
+    s3_bucket_name = os.environ["S3_BUCKET_NAME"]
+    s3_bucket_region = os.environ["S3_BUCKET_REGION"]
 except KeyError as e:
     print("Warning: Environmental variable(s) not defined")
+    if s3_bucket_name=="" or s3_bucket_region=="":
+        raise
 
 
 # Create client objects
