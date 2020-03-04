@@ -1,4 +1,4 @@
-"""AWS Route 53 Lambda Backup"""
+"""AWS Route 53 Backup"""
 
 import csv
 import json

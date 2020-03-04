@@ -5,7 +5,28 @@ A Python function to automatically back up Route 53 DNS records to S3.
 
 ## Setup
 
-This script can be run either as a scheduled AWS Lambda function, a docker container, or as a cron job. Simply upload the script to AWS Lambda, set the `s3_bucket_name` and `s3_bucket_region` environmental variables, set up an IAM role (with Route 53 read-only and S3 read-write permissions), and set a schedule.
+This script can be run either as a docker container on ECS or EKS, a scheduled AWS Lambda function, or as a bare Python script via cron job on EC2 or your own hardware. 
+
+### As a container on ECS or EKS
+
+The easiest mechanism is to use the [Docker Image](https://hub.docker.com/repository/docker/jrokeach/route53-backup). You can load this into ECS by specifying the docker image `jrokeach/route53-backup`.
+Alternatively, to install to a docker container locally, run:
+```bash
+docker pull jrokeach/route53-backup
+```
+Set the environment variables `S3_BUCKET_NAME` AND `S3_BUCKET_REGION` according to your needs.
+
+* In ECS:
+  * Ensure that your task has permissions to write to your S3 bucket and read from Route53.
+* Running Docker locally:
+  * Create a user with permissions to write to your S3 bucket and read from Route53.
+  * When specifying environment variables to run the container, also specify `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
+
+### As a lambda function
+
+Simply upload the script to AWS Lambda, set the `S3_BUCKET_NAME` and `S3_BUCKET_REGION` environmental variables, set up an IAM role (with Route 53 read-only and S3 read-write permissions), and set a schedule.
+
+### As a bare Python script
 
 Alternatively, you can set the script to run using cron on an EC2 instance with the appropriate IAM role permissions. Don't forget to add the proper Python 3 shebang and set the `s3_bucket_name` and `s3_bucket_region` variables in the file when doing so.
 
