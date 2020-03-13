@@ -89,11 +89,9 @@ def upload_to_s3(folder, filename, bucket_name, key):
         try:
             response = s3.head_object(Bucket=bucket_name, Key=key)
         except ClientError as e:
-            error = e.response.get("Error")
-            if error:
-                if error.get("Code") == "404":
-                    # 404 error means the file doesn't exist. Proceed to upload.
-                    pass
+            if e.response.get("Error", dict()).get("Code") == "404":
+                # 404 error means the file doesn't exist. Proceed to upload.
+                pass
             else:
                 raise
         else:
