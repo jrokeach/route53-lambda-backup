@@ -87,8 +87,6 @@ def upload_to_s3(folder, filename, bucket_name, key):
                     pass
             else:
                 raise
-        except:
-            raise
         else:
             # We got a response, so we need to proceed to ETag comparison to see if the file has changed.
             with open(filename, "rb") as f:
