@@ -52,6 +52,17 @@ def create_s3_bucket(bucket_name, bucket_region="us-east-1"):
             Bucket=bucket_name,
             CreateBucketConfiguration={"LocationConstraint": bucket_region},
         )
+    # Check if the bucket is newly created (it should be), and if so, block public access policies.
+    if response.get("Location"):
+        blockresponse = s3.put_public_access_block(
+            PublicAccessBlockConfiguration={
+                "BlockPublicAcls": True,
+                "IgnorePublicAcls": True,
+                "BlockPublicPolicy": True,
+                "RestrictPublicBuckets": True,
+            },
+            Bucket=bucket_name,
+        )
     return response
 
 
