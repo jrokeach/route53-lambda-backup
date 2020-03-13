@@ -20,7 +20,7 @@ s3_bucket_versioned = False
 try:
     s3_bucket_name = os.environ["S3_BUCKET_NAME"]
     s3_bucket_region = os.environ["S3_BUCKET_REGION"]
-    s3_bucket_versioned = os.environ["S3_BUCKET_VERSIONED"]
+    s3_bucket_versioned = bool(os.environ["S3_BUCKET_VERSIONED"])
 except KeyError as e:
     print("Warning: Environmental variable(s) not defined")
     if s3_bucket_name == "" or s3_bucket_region == "":
@@ -40,7 +40,16 @@ def create_s3_bucket(bucket_name, bucket_region="us-east-1"):
     """Create an Amazon S3 bucket."""
     try:
         response = s3.head_bucket(Bucket=bucket_name)
-        # TODO: Check if bucket is versioned.
+        # TODO: Change to an override model for versioning
+        versioning = s3.get_bucket_versioning(Bucket=bucket_name).get("Status")
+        if bool(versioning) != s3_bucket_versioned:
+            raise (
+                Exception(
+                    "The bucket has versioning={} but this script is set to run as versioning={}".format(
+                        versioning, s3_bucket_versioned
+                    )
+                )
+            )
         return response
     except ClientError as e:
         if e.response["Error"]["Code"] != "404":
