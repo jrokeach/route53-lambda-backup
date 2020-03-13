@@ -79,14 +79,18 @@ def upload_to_s3(folder, filename, bucket_name, key):
         # If the object doesn't already exist, no need to check ETag.
         try:
             response = s3.head_object(Bucket=bucket_name, Key=key)
-        except botocore.exceptions.ClientError as e:
+        except ClientError as e:
             error = e.response.get("Error")
             if error:
                 if error.get("Code") == "404":
-                    response = False
+                    # 404 error means the file doesn't exist. Proceed to upload.
+                    pass
             else:
                 raise
-        if response:
+        except:
+            raise
+        else:
+            # We got a response, so we need to proceed to ETag comparison to see if the file has changed.
             with open(filename, "rb") as f:
                 # TODO: Complete ETag computation for excessively large zones.
                 #       Direct MD5 is only for single part uploads.
