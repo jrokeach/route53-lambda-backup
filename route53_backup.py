@@ -9,15 +9,18 @@ from datetime import datetime
 import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
+from hashlib import md5
 
 # Set environmental variables
 
 s3_bucket_name = ""
 s3_bucket_region = ""
+s3_bucket_versioned = False
 
 try:
     s3_bucket_name = os.environ["S3_BUCKET_NAME"]
     s3_bucket_region = os.environ["S3_BUCKET_REGION"]
+    s3_bucket_versioned = os.environ["S3_BUCKET_VERSIONED"]
 except KeyError as e:
     print("Warning: Environmental variable(s) not defined")
     if s3_bucket_name == "" or s3_bucket_region == "":
@@ -37,6 +40,7 @@ def create_s3_bucket(bucket_name, bucket_region="us-east-1"):
     """Create an Amazon S3 bucket."""
     try:
         response = s3.head_bucket(Bucket=bucket_name)
+        # TODO: Check if bucket is versioned.
         return response
     except ClientError as e:
         if e.response["Error"]["Code"] != "404":
@@ -68,7 +72,26 @@ def create_s3_bucket(bucket_name, bucket_region="us-east-1"):
 
 def upload_to_s3(folder, filename, bucket_name, key):
     """Upload a file to a folder in an Amazon S3 bucket."""
+    # TODO: Change this logic so it doesn't require a folder.
     key = folder + "/" + key
+    # If the bucket is versioned, only upload if it doesn't match the existing version.
+    if s3_bucket_versioned:
+        # If the object doesn't already exist, no need to check ETag.
+        try:
+            response = s3.head_object(Bucket=bucket_name, Key=key)
+        except botocore.exceptions.ClientError as e:
+            error = e.response.get("Error")
+            if error:
+                if error.get("Code") == "404":
+                    response = False
+            else:
+                raise
+        if response:
+            with open(filename, "rb") as f:
+                # TODO: Complete ETag computation for excessively large zones.
+                #       Direct MD5 is only for single part uploads.
+                if md5(f.read()).hexdigest().join(['"', '"']) == response["ETag"]:
+                    return
     s3.upload_file(filename, bucket_name, key)
 
 
