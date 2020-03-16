@@ -20,7 +20,7 @@ s3_bucket_versioned = False
 try:
     s3_bucket_name = os.environ["S3_BUCKET_NAME"]
     s3_bucket_region = os.environ["S3_BUCKET_REGION"]
-    s3_bucket_versioned = bool(os.environ["S3_BUCKET_VERSIONED"])
+    s3_bucket_versioned = bool(int(os.environ["S3_BUCKET_VERSIONED"]) == 1)
 except KeyError as e:
     print("Warning: Environmental variable(s) not defined")
     if s3_bucket_name == "" or s3_bucket_region == "":
@@ -37,11 +37,13 @@ route53 = boto3.client("route53", config=Config(retries={"max_attempts": 10}))
 
 
 def create_s3_bucket(bucket_name, bucket_region="us-east-1"):
-    """Create an Amazon S3 bucket."""
+    """Create an Amazon S3 bucket if it doesn't exist."""
     try:
         response = s3.head_bucket(Bucket=bucket_name)
-        # TODO: Change to an override model for versioning
-        versioning = s3.get_bucket_versioning(Bucket=bucket_name).get("Status")
+        # Set versioning to a boolean; True if status returns "Enabled"
+        versioning = (
+            s3.get_bucket_versioning(Bucket=bucket_name).get("Status") == "Enabled"
+        )
         if bool(versioning) != s3_bucket_versioned:
             raise (
                 Exception(
@@ -65,9 +67,10 @@ def create_s3_bucket(bucket_name, bucket_region="us-east-1"):
             Bucket=bucket_name,
             CreateBucketConfiguration={"LocationConstraint": bucket_region},
         )
-    # Check if the bucket is newly created (it should be), and if so, block public access policies.
+    # Check if the bucket is newly created (it should be), and if so, block public access policies
+    # and apply appropriate versioning config
     if response.get("Location"):
-        blockresponse = s3.put_public_access_block(
+        s3.put_public_access_block(
             PublicAccessBlockConfiguration={
                 "BlockPublicAcls": True,
                 "IgnorePublicAcls": True,
@@ -76,6 +79,10 @@ def create_s3_bucket(bucket_name, bucket_region="us-east-1"):
             },
             Bucket=bucket_name,
         )
+        if s3_bucket_versioned:
+            s3.put_bucket_versioning(
+                Bucket=bucket_name, VersioningConfiguration={"Status": "Enabled"}
+            )
     return response
 
 
