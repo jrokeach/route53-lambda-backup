@@ -236,7 +236,12 @@ def lambda_handler(event, context):
         )
 
     """Handler function for AWS Lambda"""
-    time_stamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", datetime.utcnow().utctimetuple())
+    if not s3_bucket_versioned:
+        time_stamp = time.strftime(
+            "%Y-%m-%dT%H:%M:%SZ", datetime.utcnow().utctimetuple()
+        )
+    else:
+        time_stamp = None
     if not create_s3_bucket(s3_bucket_name, s3_bucket_region):
         return False
     # bucket_response = create_s3_bucket(s3_bucket_name, s3_bucket_region)
