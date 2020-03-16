@@ -13,18 +13,15 @@ from hashlib import md5
 
 # Set environmental variables
 
-s3_bucket_name = ""
-s3_bucket_region = ""
-s3_bucket_versioned = False
+s3_bucket_name = os.environ.get("S3_BUCKET_NAME", None)
+s3_bucket_region = os.environ.get("S3_BUCKET_REGION", None)
+s3_bucket_folder = os.environ.get("S3_BUCKET_FOLDER", None)
+s3_bucket_versioned = bool(int(os.environ.get("S3_BUCKET_VERSIONED"), 0) == 1)
 
-try:
-    s3_bucket_name = os.environ["S3_BUCKET_NAME"]
-    s3_bucket_region = os.environ["S3_BUCKET_REGION"]
-    s3_bucket_versioned = bool(int(os.environ["S3_BUCKET_VERSIONED"]) == 1)
-except KeyError as e:
-    print("Warning: Environmental variable(s) not defined")
-    if s3_bucket_name == "" or s3_bucket_region == "":
-        raise
+if not s3_bucket_name or not s3_bucket_region:
+    raise Exception(
+        "S3_BUCKET_NAME and S3_BUCKET_REGION environment variables must be set."
+    )
 
 
 # Create client objects
@@ -233,6 +230,11 @@ def write_zone_to_json(zone, zone_records):
 
 
 def lambda_handler(event, context):
+    def gen_folder(zone=dict()):
+        return "/".join(
+            filter(None, [s3_bucket_folder, time_stamp, zone.get("Name", list())[:-1]])
+        )
+
     """Handler function for AWS Lambda"""
     time_stamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", datetime.utcnow().utctimetuple())
     if not create_s3_bucket(s3_bucket_name, s3_bucket_region):
@@ -243,11 +245,11 @@ def lambda_handler(event, context):
     hosted_zones = get_route53_hosted_zones()
     print(
         "Backing up {} hosted zones to {}/{}".format(
-            len(hosted_zones), s3_bucket_name, time_stamp
+            len(hosted_zones), s3_bucket_name, gen_folder()
         )
     )
     for zone in hosted_zones:
-        zone_folder = "/".join(filter(None, [time_stamp, zone["Name"][:-1]]))
+        zone_folder = gen_folder(zone)
         zone_records = get_route53_zone_records(zone["Id"])
         upload_to_s3(
             write_zone_to_csv(zone, zone_records),
