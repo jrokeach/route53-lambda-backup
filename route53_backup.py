@@ -9,19 +9,19 @@ from datetime import datetime
 import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
+from hashlib import md5
 
 # Set environmental variables
 
-s3_bucket_name = ""
-s3_bucket_region = ""
+s3_bucket_name = os.environ.get("S3_BUCKET_NAME", None)
+s3_bucket_region = os.environ.get("S3_BUCKET_REGION", None)
+s3_bucket_folder = os.environ.get("S3_BUCKET_FOLDER", None)
+s3_bucket_versioned = bool(int(os.environ.get("S3_BUCKET_VERSIONED"), 0) == 1)
 
-try:
-    s3_bucket_name = os.environ["S3_BUCKET_NAME"]
-    s3_bucket_region = os.environ["S3_BUCKET_REGION"]
-except KeyError as e:
-    print("Warning: Environmental variable(s) not defined")
-    if s3_bucket_name == "" or s3_bucket_region == "":
-        raise
+if not s3_bucket_name or not s3_bucket_region:
+    raise Exception(
+        "S3_BUCKET_NAME and S3_BUCKET_REGION environment variables must be set."
+    )
 
 
 # Create client objects
@@ -34,9 +34,21 @@ route53 = boto3.client("route53", config=Config(retries={"max_attempts": 10}))
 
 
 def create_s3_bucket(bucket_name, bucket_region="us-east-1"):
-    """Create an Amazon S3 bucket."""
+    """Create an Amazon S3 bucket if it doesn't exist."""
     try:
         response = s3.head_bucket(Bucket=bucket_name)
+        # Set versioning to a boolean; True if status returns "Enabled"
+        versioning = (
+            s3.get_bucket_versioning(Bucket=bucket_name).get("Status") == "Enabled"
+        )
+        if bool(versioning) != s3_bucket_versioned:
+            raise (
+                Exception(
+                    "The bucket has versioning={} but this script is set to run as versioning={}".format(
+                        versioning, s3_bucket_versioned
+                    )
+                )
+            )
         return response
     except ClientError as e:
         if e.response["Error"]["Code"] != "404":
@@ -52,12 +64,47 @@ def create_s3_bucket(bucket_name, bucket_region="us-east-1"):
             Bucket=bucket_name,
             CreateBucketConfiguration={"LocationConstraint": bucket_region},
         )
+    # Check if the bucket is newly created (it should be), and if so, block public access policies
+    # and apply appropriate versioning config
+    if response.get("Location"):
+        s3.put_public_access_block(
+            PublicAccessBlockConfiguration={
+                "BlockPublicAcls": True,
+                "IgnorePublicAcls": True,
+                "BlockPublicPolicy": True,
+                "RestrictPublicBuckets": True,
+            },
+            Bucket=bucket_name,
+        )
+        if s3_bucket_versioned:
+            s3.put_bucket_versioning(
+                Bucket=bucket_name, VersioningConfiguration={"Status": "Enabled"}
+            )
     return response
 
 
-def upload_to_s3(folder, filename, bucket_name, key):
+def upload_to_s3(filename, bucket_name, key, folder=None):
     """Upload a file to a folder in an Amazon S3 bucket."""
-    key = folder + "/" + key
+    # TODO: Change this logic so it doesn't require a folder.
+    key = "/".join(filter(None, [folder, key]))
+    # If the bucket is versioned, only upload if it doesn't match the existing version.
+    if s3_bucket_versioned:
+        # If the object doesn't already exist, no need to check ETag.
+        try:
+            response = s3.head_object(Bucket=bucket_name, Key=key)
+        except ClientError as e:
+            if e.response.get("Error", dict()).get("Code") == "404":
+                # 404 error means the file doesn't exist. Proceed to upload.
+                pass
+            else:
+                raise
+        else:
+            # We got a response, so we need to proceed to ETag comparison to see if the file has changed.
+            with open(filename, "rb") as f:
+                # TODO: Complete ETag computation for excessively large zones.
+                #       Direct MD5 is only for single part uploads.
+                if md5(f.read()).hexdigest().join(['"', '"']) == response["ETag"]:
+                    return
     s3.upload_file(filename, bucket_name, key)
 
 
@@ -183,8 +230,18 @@ def write_zone_to_json(zone, zone_records):
 
 
 def lambda_handler(event, context):
+    def gen_folder(zone=dict()):
+        return "/".join(
+            filter(None, [s3_bucket_folder, time_stamp, zone.get("Name", list())[:-1]])
+        )
+
     """Handler function for AWS Lambda"""
-    time_stamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", datetime.utcnow().utctimetuple())
+    if not s3_bucket_versioned:
+        time_stamp = time.strftime(
+            "%Y-%m-%dT%H:%M:%SZ", datetime.utcnow().utctimetuple()
+        )
+    else:
+        time_stamp = None
     if not create_s3_bucket(s3_bucket_name, s3_bucket_region):
         return False
     # bucket_response = create_s3_bucket(s3_bucket_name, s3_bucket_region)
@@ -193,23 +250,23 @@ def lambda_handler(event, context):
     hosted_zones = get_route53_hosted_zones()
     print(
         "Backing up {} hosted zones to {}/{}".format(
-            len(hosted_zones), s3_bucket_name, time_stamp
+            len(hosted_zones), s3_bucket_name, gen_folder()
         )
     )
     for zone in hosted_zones:
-        zone_folder = time_stamp + "/" + zone["Name"][:-1]
+        zone_folder = gen_folder(zone)
         zone_records = get_route53_zone_records(zone["Id"])
         upload_to_s3(
-            zone_folder,
             write_zone_to_csv(zone, zone_records),
             s3_bucket_name,
             (zone["Name"] + "csv"),
+            folder=zone_folder,
         )
         upload_to_s3(
-            zone_folder,
             write_zone_to_json(zone, zone_records),
             s3_bucket_name,
             (zone["Name"] + "json"),
+            folder=zone_folder,
         )
     return True
 
