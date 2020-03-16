@@ -86,10 +86,10 @@ def create_s3_bucket(bucket_name, bucket_region="us-east-1"):
     return response
 
 
-def upload_to_s3(folder, filename, bucket_name, key):
+def upload_to_s3(filename, bucket_name, key, folder=None):
     """Upload a file to a folder in an Amazon S3 bucket."""
     # TODO: Change this logic so it doesn't require a folder.
-    key = folder + "/" + key
+    key = "/".join(filter(None, [folder, key]))
     # If the bucket is versioned, only upload if it doesn't match the existing version.
     if s3_bucket_versioned:
         # If the object doesn't already exist, no need to check ETag.
@@ -247,19 +247,19 @@ def lambda_handler(event, context):
         )
     )
     for zone in hosted_zones:
-        zone_folder = time_stamp + "/" + zone["Name"][:-1]
+        zone_folder = "/".join(filter(None, [time_stamp, zone["Name"][:-1]]))
         zone_records = get_route53_zone_records(zone["Id"])
         upload_to_s3(
-            zone_folder,
             write_zone_to_csv(zone, zone_records),
             s3_bucket_name,
             (zone["Name"] + "csv"),
+            folder=zone_folder,
         )
         upload_to_s3(
-            zone_folder,
             write_zone_to_json(zone, zone_records),
             s3_bucket_name,
             (zone["Name"] + "json"),
+            folder=zone_folder,
         )
     return True
 
