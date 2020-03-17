@@ -14,12 +14,12 @@ or Docker container via cron job on EC2 or your own hardware.
 
 In any environment, the recommended manner of configuring settings is to use the following environment variables:
 
-| Variable          | Default | Description                                                         |
-|-------------------|---------|---------------------------------------------------------------------|
-| S3_BUCKET_NAME    | None    | (Required) Name of the S3 bucket for output                         |
-| S3_BUCKET_REGION  | None    | (Required) AWS Bucket Region like "us-east-1" or "us-west-2"        |
-| S3_BUCKET_FOLDER  | None    | (Optional) Folder prefix for everything output to S3 bucket. (No /) |
-| S3_BUCKET_VERSION | 0       | Must be 0 or 1. Set to 1 to turn on versioned mode (Recommended)    |
+| Variable            | Default | Description                                                         |
+|---------------------|---------|---------------------------------------------------------------------|
+| S3_BUCKET_NAME      | None    | (Required) Name of the S3 bucket for output                         |
+| S3_BUCKET_REGION    | None    | (Required) AWS Bucket Region like "us-east-1" or "us-west-2"        |
+| S3_BUCKET_FOLDER    | None    | (Optional) Folder prefix for everything output to S3 bucket. (No /) |
+| S3_BUCKET_VERSIONED | 0       | Must be 0 or 1. Set to 1 to turn on versioned mode (Recommended)    |
 
 ### As a container
 
